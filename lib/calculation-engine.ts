@@ -110,6 +110,8 @@ export function calculateArrears(req: CalculationRequest): Segment[] {
         const preRevDAPct = activePreRevDA ? activePreRevDA.percentage : 0
 
         const daysInSeg = differenceInDays(segEnd, segStart) + 1
+        // Used for denominator
+        const daysInMonth = differenceInDays(endOfMonth(segStart), startOfMonth(segStart)) + 1
 
         // CALCULATION LOGIC (30-day basis)
         const isFullMonth = isSameDay(startOfMonth(segStart), segStart) && isSameDay(endOfMonth(segEnd), segEnd)
