@@ -23,12 +23,12 @@ const mockPayEvents = [
 
 const mockDARates = [
     // Revised
-    { effectiveDate: new Date('2016-01-01'), percentage: 0, type: 'REVISED' },
-    { effectiveDate: new Date('2016-07-01'), percentage: 2, type: 'REVISED' },
+    { effectiveDate: new Date('2016-01-01'), percentage: 0, type: 'REVISED' as const },
+    { effectiveDate: new Date('2016-07-01'), percentage: 2, type: 'REVISED' as const },
     // Pre-Revised
-    { effectiveDate: new Date('2016-01-01'), percentage: 125, type: 'PRE_REVISED' },
+    { effectiveDate: new Date('2016-01-01'), percentage: 125, type: 'PRE_REVISED' as const },
     // 01.07.2016 is 132%
-    { effectiveDate: new Date('2016-07-01'), percentage: 132, type: 'PRE_REVISED' }
+    { effectiveDate: new Date('2016-07-01'), percentage: 132, type: 'PRE_REVISED' as const }
 ]
 
 const result = calculateArrears({

@@ -131,8 +131,9 @@ export function calculateArrears(req: CalculationRequest): Segment[] {
             segmentDrawn = monthlyTotalDrawn
             durationLabel = "1 M"
         } else {
-            segmentDue = Math.round(monthlyTotalDue * (daysInSeg / 30))
-            segmentDrawn = Math.round(monthlyTotalDrawn * (daysInSeg / 30))
+            // Use Actual Days in Month for denominator (matches Reference Sheet logic for May 2018)
+            segmentDue = Math.round(monthlyTotalDue * (daysInSeg / daysInMonth))
+            segmentDrawn = Math.round(monthlyTotalDrawn * (daysInSeg / daysInMonth))
             durationLabel = `${daysInSeg} D`
         }
 

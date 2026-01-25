@@ -41,6 +41,12 @@ const payEvents = [
     // June 2016 Change
     { date: new Date('2016-06-23'), type: 'CHANGE', basicPay: 50700, drawnBasicPay: 14680, drawnGradePay: 4700, drawnIR: 969 },
 
+    // Jan 2017 Increment (Missing in previous run)
+    { date: new Date('2017-01-01'), type: 'CHANGE', basicPay: 53800, drawnBasicPay: 15850, drawnGradePay: 4700, drawnIR: 1028 },
+
+    // Jan 2018 Increment (Missing in previous run)
+    { date: new Date('2018-01-01'), type: 'CHANGE', basicPay: 55400, drawnBasicPay: 16470, drawnGradePay: 4700, drawnIR: 1059 },
+
     // May 2018 Change
     { date: new Date('2018-05-05'), type: 'CHANGE', basicPay: 57200, drawnBasicPay: 17110, drawnGradePay: 5350, drawnIR: 1123 },
 
