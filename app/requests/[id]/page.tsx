@@ -120,6 +120,8 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
         <ImageVerifier 
           segments={serializedSegments}
           totalArrear={totalArrear}
+          daRates={safeDARates}
+          requestId={id}
         />
       </div>
     </div>

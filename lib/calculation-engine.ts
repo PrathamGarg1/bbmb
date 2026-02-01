@@ -165,3 +165,139 @@ export function calculateArrears(req: CalculationRequest): Segment[] {
 
     return segments
 }
+
+// ============================================================================
+// CALCULATION COMPARISON FOR OCR VERIFICATION
+// ============================================================================
+
+export interface CalculationDiscrepancy {
+    field: string
+    period: string
+    systemValue: number
+    sheetValue: number
+    difference: number
+    percentDiff: number
+    possibleReasons: string[]
+}
+
+export interface CalculationComparison {
+    systemResult: Segment[]
+    sheetCalculations: {
+        totalDue: number
+        totalDrawn: number
+        netArrear: number
+    }
+    discrepancies: CalculationDiscrepancy[]
+    overallAccuracy: number
+    matchPercentage: number
+}
+
+export function compareCalculations(
+    systemSegments: Segment[],
+    sheetData: {
+        totalDue: number
+        totalDrawn: number
+        netArrear: number
+        breakdowns?: Array<{ period: string; amount: number }>
+    }
+): CalculationComparison {
+    const discrepancies: CalculationDiscrepancy[] = []
+
+    // Calculate system totals
+    const systemTotalDue = systemSegments.reduce((sum, seg) => sum + seg.totalDue, 0)
+    const systemTotalDrawn = systemSegments.reduce((sum, seg) => sum + seg.totalDrawn, 0)
+    const systemNetArrear = systemTotalDue - systemTotalDrawn
+
+    // Compare Total Due
+    const dueDiff = Math.abs(systemTotalDue - sheetData.totalDue)
+    if (dueDiff > systemTotalDue * 0.01) { // 1% tolerance
+        const possibleReasons = []
+        if (dueDiff > 1000) possibleReasons.push('Missing pay events or incorrect basic pay')
+        if (dueDiff % 100 < 10) possibleReasons.push('Possible rounding difference')
+        possibleReasons.push('Different DA rate applied')
+
+        discrepancies.push({
+            field: 'Total Due',
+            period: 'Overall',
+            systemValue: systemTotalDue,
+            sheetValue: sheetData.totalDue,
+            difference: systemTotalDue - sheetData.totalDue,
+            percentDiff: ((systemTotalDue - sheetData.totalDue) / sheetData.totalDue) * 100,
+            possibleReasons,
+        })
+    }
+
+    // Compare Total Drawn
+    const drawnDiff = Math.abs(systemTotalDrawn - sheetData.totalDrawn)
+    if (drawnDiff > systemTotalDrawn * 0.01) {
+        const possibleReasons = []
+        if (drawnDiff > 1000) possibleReasons.push('Incorrect drawn basic pay or grade pay')
+        possibleReasons.push('Different pre-revised DA rate')
+        possibleReasons.push('Missing interim relief component')
+
+        discrepancies.push({
+            field: 'Total Drawn',
+            period: 'Overall',
+            systemValue: systemTotalDrawn,
+            sheetValue: sheetData.totalDrawn,
+            difference: systemTotalDrawn - sheetData.totalDrawn,
+            percentDiff: ((systemTotalDrawn - sheetData.totalDrawn) / sheetData.totalDrawn) * 100,
+            possibleReasons,
+        })
+    }
+
+    // Compare Net Arrear
+    const arrearDiff = Math.abs(systemNetArrear - sheetData.netArrear)
+    if (arrearDiff > systemNetArrear * 0.01) {
+        discrepancies.push({
+            field: 'Net Arrear',
+            period: 'Overall',
+            systemValue: systemNetArrear,
+            sheetValue: sheetData.netArrear,
+            difference: systemNetArrear - sheetData.netArrear,
+            percentDiff: ((systemNetArrear - sheetData.netArrear) / sheetData.netArrear) * 100,
+            possibleReasons: ['Cascading effect from Due/Drawn differences'],
+        })
+    }
+
+    // Period-wise comparison if breakdowns available
+    if (sheetData.breakdowns && sheetData.breakdowns.length > 0) {
+        sheetData.breakdowns.forEach((breakdown, index) => {
+            if (index < systemSegments.length) {
+                const seg = systemSegments[index]
+                const segArrear = seg.totalDue - seg.totalDrawn
+                const diff = Math.abs(segArrear - breakdown.amount)
+
+                if (diff > segArrear * 0.02) { // 2% tolerance for segments
+                    discrepancies.push({
+                        field: 'Period Arrear',
+                        period: breakdown.period,
+                        systemValue: segArrear,
+                        sheetValue: breakdown.amount,
+                        difference: segArrear - breakdown.amount,
+                        percentDiff: ((segArrear - breakdown.amount) / breakdown.amount) * 100,
+                        possibleReasons: ['Period-specific calculation error', 'Different pro-rata logic'],
+                    })
+                }
+            }
+        })
+    }
+
+    // Calculate overall accuracy
+    const totalFields = 3 + (sheetData.breakdowns?.length || 0)
+    const matchingFields = totalFields - discrepancies.length
+    const matchPercentage = (matchingFields / totalFields) * 100
+
+    // Accuracy based on magnitude of errors
+    const totalSystemValue = systemTotalDue + systemTotalDrawn + systemNetArrear
+    const totalError = discrepancies.reduce((sum, d) => sum + Math.abs(d.difference), 0)
+    const overallAccuracy = Math.max(0, 100 - (totalError / totalSystemValue) * 100)
+
+    return {
+        systemResult: systemSegments,
+        sheetCalculations: sheetData,
+        discrepancies,
+        overallAccuracy,
+        matchPercentage,
+    }
+}
