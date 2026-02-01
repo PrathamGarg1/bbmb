@@ -533,8 +533,11 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
               const yearWise = calculateYearWiseSummary(editedData.payEvents)
               return (
                 <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl border border-indigo-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-indigo-900">Year-wise Arrear Breakdown</h3>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-indigo-900 mb-1">Year-wise Total Amount to be Reimbursed</h3>
+                      <p className="text-sm text-indigo-700">Breakdown by calendar year</p>
+                    </div>
                     <button
                       onClick={() => exportToExcel({
                         employeeInfo: editedData.metadata,
@@ -548,25 +551,30 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
                       Export to Excel
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    {yearWise.yearlyBreakdown.map(item => (
-                      <div key={item.year} className="bg-white p-4 rounded-lg border border-indigo-100">
-                        <div className="text-sm font-medium text-indigo-700 mb-1">{item.year}</div>
-                        <div className="text-2xl font-bold text-indigo-900">₹{item.totalArrear.toLocaleString()}</div>
-                        <div className="text-xs text-slate-600 mt-1">{item.periodCount} periods</div>
-                      </div>
-                    ))}
+                  
+                  {/* Year-wise list */}
+                  <div className="bg-white rounded-lg p-6 mb-4">
+                    <div className="space-y-3">
+                      {yearWise.yearlyBreakdown.map(item => (
+                        <div key={item.year} className="flex items-center justify-between py-3 border-b border-slate-200 last:border-0">
+                          <div className="flex items-center gap-4">
+                            <div className="text-lg font-bold text-indigo-900 w-16">{item.year}</div>
+                            <div className="text-sm text-slate-600">{item.periodCount} periods</div>
+                          </div>
+                          <div className="text-xl font-bold text-indigo-900">₹{item.totalArrear.toLocaleString()}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 rounded-lg text-white">
+                  
+                  {/* Grand Total */}
+                  <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-lg text-white">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium opacity-90">Grand Total Arrear</div>
-                        <div className="text-3xl font-bold mt-1">₹{yearWise.grandTotal.toLocaleString()}</div>
+                        <div className="text-xs opacity-75 mt-1">Total across all {editedData.payEvents.length} periods</div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm opacity-90">Total Periods</div>
-                        <div className="text-2xl font-bold">{editedData.payEvents.length}</div>
-                      </div>
+                      <div className="text-4xl font-bold">₹{yearWise.grandTotal.toLocaleString()}</div>
                     </div>
                   </div>
                 </div>

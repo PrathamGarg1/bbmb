@@ -66,11 +66,12 @@ export function exportToExcel(data: {
 
     if (data.yearWiseSummary) {
         summaryData.push([]);
-        summaryData.push(['Year-wise Breakdown']);
+        summaryData.push(['Year-wise Total Amount to be Reimbursed']);
         summaryData.push(['Year', 'Total Arrear', 'Number of Periods']);
         data.yearWiseSummary.yearlyBreakdown.forEach(item => {
             summaryData.push([item.year, item.totalArrear, item.periodCount]);
         });
+        summaryData.push([]);
         summaryData.push(['Grand Total', data.yearWiseSummary.grandTotal, '']);
     }
 
