@@ -39,19 +39,22 @@ export function calculateYearWiseSummary(payEvents: any[]): {
  * Export extracted calculation data to Excel
  */
 export function exportToExcel(data: {
-    employeeInfo: { name: string; employeeId: string; designation?: string };
+    employeeInfo: { name?: string; employeeName?: string; employeeId: string; designation?: string };
     payEvents: any[];
     calculations: { totalDue: number; totalDrawn: number; netArrear: number };
     yearWiseSummary?: { yearlyBreakdown: any[]; grandTotal: number };
 }): void {
     const workbook = XLSX.utils.book_new();
 
+    // Get employee name from either field
+    const employeeName = data.employeeInfo.name || data.employeeInfo.employeeName || 'Unknown';
+
     // Sheet 1: Summary
     const summaryData = [
         ['BBMB Arrear Calculation - OCR Extracted Data'],
         [],
         ['Employee Information'],
-        ['Name', data.employeeInfo.name],
+        ['Name', employeeName],
         ['Employee ID', data.employeeInfo.employeeId],
         ['Designation', data.employeeInfo.designation || 'N/A'],
         [],
