@@ -1,5 +1,6 @@
 
 
+
 import { prisma } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import { format } from 'date-fns'
@@ -8,6 +9,7 @@ import { ChevronLeft, Download } from 'lucide-react'
 import PayEventsEditor from './events-editor'
 import CalculationGrid from './calculation-grid'
 import ApprovalWorkflow from './approval-workflow'
+import ImageVerifier from './image-verifier'
 import { MotionButton } from '@/components/ui/motion-button'
 import { generatePDF } from '@/lib/pdf-generator'
 import { calculateArrears } from '@/lib/calculation-engine'
@@ -85,6 +87,53 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
              />
            </div>
         </div>
+      </div>
+
+      {/* Image Verification Section */}
+      <div className="mt-6">
+        <ImageVerifier 
+          segments={(() => {
+            const safeEvents = request.payEvents.map(p => ({
+              ...p,
+              date: new Date(p.date),
+              drawnBasicPay: p.drawnBasicPay ?? undefined,
+              drawnGradePay: p.drawnGradePay ?? undefined,
+              drawnIR: p.drawnIR ?? undefined
+            }))
+            const safeDARates = daRates.map(d => ({
+              ...d,
+              effectiveDate: new Date(d.effectiveDate),
+              type: d.type as 'REVISED' | 'PRE_REVISED'
+            }))
+            return calculateArrears({
+              startDate: new Date(request.startDate),
+              endDate: new Date(request.endDate),
+              payEvents: safeEvents,
+              daRates: safeDARates
+            })
+          })()}
+          totalArrear={(() => {
+            const safeEvents = request.payEvents.map(p => ({
+              ...p,
+              date: new Date(p.date),
+              drawnBasicPay: p.drawnBasicPay ?? undefined,
+              drawnGradePay: p.drawnGradePay ?? undefined,
+              drawnIR: p.drawnIR ?? undefined
+            }))
+            const safeDARates = daRates.map(d => ({
+              ...d,
+              effectiveDate: new Date(d.effectiveDate),
+              type: d.type as 'REVISED' | 'PRE_REVISED'
+            }))
+            const segments = calculateArrears({
+              startDate: new Date(request.startDate),
+              endDate: new Date(request.endDate),
+              payEvents: safeEvents,
+              daRates: safeDARates
+            })
+            return segments.reduce((sum, seg) => sum + (seg.totalDue - seg.totalDrawn), 0)
+          })()}
+        />
       </div>
     </div>
   )
