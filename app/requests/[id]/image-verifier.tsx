@@ -90,35 +90,40 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
         const geminiData = await response.json()
         console.log('Gemini extraction successful! Confidence:', geminiData.confidence)
         
-        // Convert Gemini format to internal format
+        // Validate Gemini response structure
+        if (!geminiData.employeeInfo || !geminiData.period || !geminiData.payEvents) {
+          throw new Error('Invalid Gemini response structure')
+        }
+        
+        // Convert Gemini format to internal format with null safety
         const structured = {
           metadata: {
-            employeeName: geminiData.employeeInfo.name,
-            employeeId: geminiData.employeeInfo.employeeId,
-            designation: geminiData.employeeInfo.designation,
+            employeeName: geminiData.employeeInfo.name || 'Unknown',
+            employeeId: geminiData.employeeInfo.employeeId || 'N/A',
+            designation: geminiData.employeeInfo.designation || null,
             period: {
               start: parseDate(geminiData.period.startDate),
               end: parseDate(geminiData.period.endDate)
             }
           },
-          payEvents: geminiData.payEvents.map((event: any) => ({
+          payEvents: (geminiData.payEvents || []).map((event: any) => ({
             date: parseDate(event.date),
-            basicPay: event.basicPay,
-            gradePay: event.gradePay,
-            daPercent: event.daPercent,
-            hra: event.hra,
-            totalPay: event.basicPay + (event.gradePay || 0) + (event.hra || 0),
-            type: event.eventType,
-            confidence: geminiData.confidence
+            basicPay: event.basicPay || 0,
+            gradePay: event.gradePay || null,
+            daPercent: event.daPercent || 0,
+            hra: event.hra || null,
+            totalPay: (event.basicPay || 0) + (event.gradePay || 0) + (event.hra || 0),
+            type: event.eventType || 'NORMAL',
+            confidence: geminiData.confidence || 0.5
           })),
           calculations: {
-            totalDue: geminiData.calculations.totalDue,
-            totalDrawn: geminiData.calculations.totalDrawn,
-            netArrear: geminiData.calculations.netArrear,
-            breakdowns: geminiData.calculations.periodBreakdowns || []
+            totalDue: geminiData.calculations?.totalDue || 0,
+            totalDrawn: geminiData.calculations?.totalDrawn || 0,
+            netArrear: geminiData.calculations?.netArrear || 0,
+            breakdowns: geminiData.calculations?.periodBreakdowns || []
           },
           rawOCRText: JSON.stringify(geminiData, null, 2),
-          confidence: geminiData.confidence
+          confidence: geminiData.confidence || 0.5
         }
 
         setExtractedData(structured)
@@ -148,19 +153,47 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
     }
   }
 
-  // Helper function to parse dates
-  const parseDate = (dateStr: string): Date => {
-    const parts = dateStr.split(/[./-]/)
-    if (parts.length === 3) {
-      const day = parseInt(parts[0])
-      const month = parseInt(parts[1]) - 1
-      let year = parseInt(parts[2])
-      if (year < 100) {
-        year += year < 50 ? 2000 : 1900
-      }
-      return new Date(year, month, day)
+  // Helper function to parse dates with validation
+  const parseDate = (dateStr: string | null | undefined): Date => {
+    if (!dateStr) {
+      console.warn('parseDate received null/undefined, using current date')
+      return new Date()
     }
-    return new Date()
+
+    try {
+      const parts = dateStr.split(/[./-]/)
+      if (parts.length === 3) {
+        const day = parseInt(parts[0])
+        const month = parseInt(parts[1]) - 1
+        let year = parseInt(parts[2])
+        
+        // Validate parsed values
+        if (isNaN(day) || isNaN(month) || isNaN(year)) {
+          console.warn(`Invalid date components in "${dateStr}", using current date`)
+          return new Date()
+        }
+        
+        if (year < 100) {
+          year += year < 50 ? 2000 : 1900
+        }
+        
+        const date = new Date(year, month, day)
+        
+        // Validate the created date
+        if (isNaN(date.getTime())) {
+          console.warn(`Invalid date created from "${dateStr}", using current date`)
+          return new Date()
+        }
+        
+        return date
+      }
+      
+      console.warn(`Date string "${dateStr}" doesn't match expected format, using current date`)
+      return new Date()
+    } catch (error) {
+      console.error('Error parsing date:', error)
+      return new Date()
+    }
   }
 
   // ============================================================================
