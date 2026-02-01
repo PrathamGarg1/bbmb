@@ -1,4 +1,5 @@
 import Tesseract from 'tesseract.js';
+import { extractWithGemini, extractMultipleWithGemini, geminiToInternalFormat } from './gemini-ocr';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -49,8 +50,25 @@ export interface ExtractedData {
 // CORE OCR PROCESSING
 // ============================================================================
 
-export const processImage = async (imageFile: File): Promise<OCRResult> => {
+export const processImage = async (imageFile: File, useGemini: boolean = true): Promise<OCRResult> => {
     try {
+        // Try Gemini first if enabled and API key is available
+        if (useGemini && process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+            try {
+                console.log('Using Gemini Vision API for OCR...');
+                const geminiResult = await extractWithGemini(imageFile);
+                return {
+                    text: JSON.stringify(geminiResult),
+                    confidence: geminiResult.confidence
+                };
+            } catch (geminiError) {
+                console.warn('Gemini extraction failed, falling back to Tesseract:', geminiError);
+                // Fall through to Tesseract
+            }
+        }
+
+        // Fallback to Tesseract
+        console.log('Using Tesseract.js for OCR...');
         const result = await Tesseract.recognize(imageFile, 'eng', {
             logger: (m) => {
                 if (m.status === 'recognizing text') {
@@ -69,8 +87,24 @@ export const processImage = async (imageFile: File): Promise<OCRResult> => {
     }
 };
 
-export const processMultipleImages = async (imageFiles: File[]): Promise<OCRResult> => {
-    const results = await Promise.all(imageFiles.map(processImage));
+export const processMultipleImages = async (imageFiles: File[], useGemini: boolean = true): Promise<OCRResult> => {
+    // Try Gemini for multi-page processing if enabled
+    if (useGemini && process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+        try {
+            console.log('Using Gemini Vision API for multi-page OCR...');
+            const geminiResult = await extractMultipleWithGemini(imageFiles);
+            return {
+                text: JSON.stringify(geminiResult),
+                confidence: geminiResult.confidence
+            };
+        } catch (geminiError) {
+            console.warn('Gemini multi-page extraction failed, falling back to Tesseract:', geminiError);
+            // Fall through to Tesseract
+        }
+    }
+
+    // Fallback to Tesseract
+    const results = await Promise.all(imageFiles.map(file => processImage(file, false)));
 
     const combinedText = results.map(r => r.text).join('\n\n--- PAGE BREAK ---\n\n');
     const avgConfidence = results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
@@ -86,6 +120,20 @@ export const processMultipleImages = async (imageFiles: File[]): Promise<OCRResu
 // ============================================================================
 
 export const extractStructuredData = (ocrText: string): ExtractedSheetData => {
+    // Check if this is Gemini JSON output
+    try {
+        const parsed = JSON.parse(ocrText);
+        if (parsed.employeeInfo && parsed.payEvents) {
+            // This is Gemini output, convert to internal format
+            console.log('Processing Gemini-extracted data...');
+            return geminiToInternalFormat(parsed);
+        }
+    } catch (e) {
+        // Not JSON, proceed with Tesseract text parsing
+        console.log('Processing Tesseract text output...');
+    }
+
+    // Tesseract fallback: parse unstructured text
     const metadata = extractMetadata(ocrText);
     const payEvents = extractPayEvents(ocrText);
     const calculations = extractCalculations(ocrText);

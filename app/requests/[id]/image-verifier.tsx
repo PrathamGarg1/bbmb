@@ -66,14 +66,72 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
     setError(null)
 
     try {
-      // Process all images
+      // Try Gemini API first
+      try {
+        console.log('Attempting Gemini Vision API extraction...')
+        const formData = new FormData()
+        uploadedImages.forEach(img => {
+          formData.append('images', img.file)
+        })
+
+        const response = await fetch('/api/ocr/gemini', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!response.ok) {
+          throw new Error('Gemini API request failed')
+        }
+
+        const geminiData = await response.json()
+        
+        // Convert Gemini format to internal format
+        const structured = {
+          metadata: {
+            employeeName: geminiData.employeeInfo.name,
+            employeeId: geminiData.employeeInfo.employeeId,
+            designation: geminiData.employeeInfo.designation,
+            period: {
+              start: parseDate(geminiData.period.startDate),
+              end: parseDate(geminiData.period.endDate)
+            }
+          },
+          payEvents: geminiData.payEvents.map((event: any) => ({
+            date: parseDate(event.date),
+            basicPay: event.basicPay,
+            gradePay: event.gradePay,
+            daPercent: event.daPercent,
+            hra: event.hra,
+            totalPay: event.basicPay + (event.gradePay || 0) + (event.hra || 0),
+            type: event.eventType,
+            confidence: geminiData.confidence
+          })),
+          calculations: {
+            totalDue: geminiData.calculations.totalDue,
+            totalDrawn: geminiData.calculations.totalDrawn,
+            netArrear: geminiData.calculations.netArrear,
+            breakdowns: geminiData.calculations.periodBreakdowns || []
+          },
+          rawOCRText: JSON.stringify(geminiData, null, 2),
+          confidence: geminiData.confidence
+        }
+
+        setExtractedData(structured)
+        setEditedData(structured)
+        setCurrentStep('review')
+        return
+      } catch (geminiError) {
+        console.warn('Gemini extraction failed, falling back to Tesseract:', geminiError)
+        setError('Gemini API unavailable, using Tesseract (lower accuracy). Please add GEMINI_API_KEY to .env for better results.')
+      }
+
+      // Fallback to Tesseract
+      console.log('Using Tesseract fallback...')
       const ocrResult = await processMultipleImages(uploadedImages.map(img => img.file))
-      
-      // Extract structured data
       const structured = extractStructuredData(ocrResult.text)
       
       setExtractedData(structured)
-      setEditedData(structured) // Initialize edited data
+      setEditedData(structured)
       setCurrentStep('review')
     } catch (err) {
       console.error('Extraction error:', err)
@@ -81,6 +139,21 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
     } finally {
       setProcessing(false)
     }
+  }
+
+  // Helper function to parse dates
+  const parseDate = (dateStr: string): Date => {
+    const parts = dateStr.split(/[./-]/)
+    if (parts.length === 3) {
+      const day = parseInt(parts[0])
+      const month = parseInt(parts[1]) - 1
+      let year = parseInt(parts[2])
+      if (year < 100) {
+        year += year < 50 ? 2000 : 1900
+      }
+      return new Date(year, month, day)
+    }
+    return new Date()
   }
 
   // ============================================================================
