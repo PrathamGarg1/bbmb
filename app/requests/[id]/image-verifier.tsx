@@ -2,12 +2,13 @@
 
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, FileImage, X, CheckCircle, AlertCircle, Loader2, ChevronRight, ChevronLeft, Download } from 'lucide-react'
+import { Upload, FileImage, X, CheckCircle, AlertCircle, Loader2, ChevronRight, ChevronLeft, Download, FileSpreadsheet } from 'lucide-react'
 import { processMultipleImages, extractStructuredData, ExtractedSheetData } from '@/lib/ocr-processor'
 import { calculateArrears, compareCalculations, type CalculationComparison } from '@/lib/calculation-engine'
 import { DataEditor } from '@/components/ocr/data-editor'
 import { ComparisonView } from '@/components/ocr/comparison-view'
 import { generateVerificationReport } from '@/lib/report-generator'
+import { calculateYearWiseSummary, exportToExcel } from '@/lib/excel-export'
 
 interface ImageVerifierProps {
   segments: any[]
@@ -526,6 +527,51 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
                 </tbody>
               </table>
             </div>
+
+            {/* Year-wise Breakdown */}
+            {(() => {
+              const yearWise = calculateYearWiseSummary(editedData.payEvents)
+              return (
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-xl border border-indigo-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-indigo-900">Year-wise Arrear Breakdown</h3>
+                    <button
+                      onClick={() => exportToExcel({
+                        employeeInfo: editedData.metadata,
+                        payEvents: editedData.payEvents,
+                        calculations: editedData.calculations,
+                        yearWiseSummary: yearWise
+                      })}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <FileSpreadsheet className="h-4 w-4" />
+                      Export to Excel
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    {yearWise.yearlyBreakdown.map(item => (
+                      <div key={item.year} className="bg-white p-4 rounded-lg border border-indigo-100">
+                        <div className="text-sm font-medium text-indigo-700 mb-1">{item.year}</div>
+                        <div className="text-2xl font-bold text-indigo-900">₹{item.totalArrear.toLocaleString()}</div>
+                        <div className="text-xs text-slate-600 mt-1">{item.periodCount} periods</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 rounded-lg text-white">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium opacity-90">Grand Total Arrear</div>
+                        <div className="text-3xl font-bold mt-1">₹{yearWise.grandTotal.toLocaleString()}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm opacity-90">Total Periods</div>
+                        <div className="text-2xl font-bold">{editedData.payEvents.length}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Discrepancies */}
             {comparison.discrepancies.length > 0 && (
