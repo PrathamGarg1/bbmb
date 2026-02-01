@@ -47,8 +47,9 @@ export async function POST(request: NextRequest) {
 }
 
 async function processImageWithGemini(file: File) {
-  // Use gemini-pro-vision for v1beta API (supports image input)
-  const model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
+  // Use gemini-2.0-flash for v1 API (fast, supports image input)
+  // Available models: gemini-2.5-flash, gemini-2.0-flash, gemini-2.5-pro
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   // Convert File to ArrayBuffer then to base64
   const arrayBuffer = await file.arrayBuffer();
