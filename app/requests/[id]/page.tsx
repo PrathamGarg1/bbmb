@@ -1,12 +1,22 @@
 
+
 import { prisma } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import { format } from 'date-fns'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Download } from 'lucide-react'
 import PayEventsEditor from './events-editor'
 import CalculationGrid from './calculation-grid'
 import ApprovalWorkflow from './approval-workflow'
+import { MotionButton } from '@/components/ui/motion-button'
+import { generatePDF } from '@/lib/pdf-generator'
+import { calculateArrears } from '@/lib/calculation-engine'
+
+// Need to make this a Client Component to use onClick for PDF
+// OR: keep this server component and wrap the header actions in a client component.
+// Let's refactor the Header into a Client Component for simplicity.
+
+import { RequestHeaderActions } from './header-actions'
 
 export default async function RequestDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params
@@ -25,16 +35,21 @@ export default async function RequestDetailPage({ params }: { params: { id: stri
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-4">
-        <Link href="/dashboard" className="text-gray-500 hover:text-gray-700">
-          <ChevronLeft />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{request.employeeName} ({request.employeeId})</h1>
-          <p className="text-sm text-gray-500">
-            {format(request.startDate, 'dd MMM yyyy')} - {format(request.endDate, 'dd MMM yyyy')} • Status: {request.status}
-          </p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Link href="/dashboard" className="text-gray-500 hover:text-gray-700">
+            <ChevronLeft />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{request.employeeName} ({request.employeeId})</h1>
+            <p className="text-sm text-gray-500">
+              {format(request.startDate, 'dd MMM yyyy')} - {format(request.endDate, 'dd MMM yyyy')} • Status: {request.status}
+            </p>
+          </div>
         </div>
+        
+        {/* Client Actions: Export PDF */}
+        <RequestHeaderActions request={request} daRates={daRates} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
