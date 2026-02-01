@@ -4,44 +4,56 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 export async function POST(request: NextRequest) {
-    try {
-        const formData = await request.formData();
-        const files = formData.getAll('images') as File[];
-
-        if (files.length === 0) {
-            return NextResponse.json(
-                { error: 'No images provided' },
-                { status: 400 }
-            );
-        }
-
-        console.log(`Processing ${files.length} images with Gemini...`);
-
-        // Process all images
-        const results = await Promise.all(files.map(file => processImageWithGemini(file)));
-
-        // Merge results for multi-page documents
-        const merged = mergeResults(results);
-
-        return NextResponse.json(merged);
-
-    } catch (error) {
-        console.error('Gemini API error:', error);
-        return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'Failed to process images' },
-            { status: 500 }
-        );
+  try {
+    // Check if API key is configured
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('GEMINI_API_KEY not found in environment variables');
+      return NextResponse.json(
+        { error: 'Gemini API key not configured' },
+        { status: 500 }
+      );
     }
+
+    console.log('Gemini API key found:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
+
+    const formData = await request.formData();
+    const files = formData.getAll('images') as File[];
+
+    if (files.length === 0) {
+      return NextResponse.json(
+        { error: 'No images provided' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`Processing ${files.length} images with Gemini...`);
+
+    // Process all images
+    const results = await Promise.all(files.map(file => processImageWithGemini(file)));
+
+    // Merge results for multi-page documents
+    const merged = mergeResults(results);
+
+    return NextResponse.json(merged);
+
+  } catch (error) {
+    console.error('Gemini API error:', error);
+    console.error('Error details:', error instanceof Error ? error.stack : error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to process images' },
+      { status: 500 }
+    );
+  }
 }
 
 async function processImageWithGemini(file: File) {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    // Convert File to ArrayBuffer then to base64
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
+  // Convert File to ArrayBuffer then to base64
+  const arrayBuffer = await file.arrayBuffer();
+  const base64 = Buffer.from(arrayBuffer).toString('base64');
 
-    const prompt = `You are analyzing a government arrear calculation sheet from BBMB (Bhakra Beas Management Board). This document contains detailed pay calculations for an employee.
+  const prompt = `You are analyzing a government arrear calculation sheet from BBMB (Bhakra Beas Management Board). This document contains detailed pay calculations for an employee.
 
 CRITICAL INSTRUCTIONS:
 1. This is a TABULAR document with rows and columns
@@ -130,49 +142,49 @@ Return the data in this EXACT JSON format (no markdown, just pure JSON):
   "confidence": number (0.0 to 1.0, your confidence in this extraction)
 }`;
 
-    const result = await model.generateContent([
-        prompt,
-        {
-            inlineData: {
-                mimeType: file.type,
-                data: base64
-            }
-        }
-    ]);
-
-    const response = await result.response;
-    const text = response.text();
-
-    // Extract JSON from response (Gemini sometimes wraps it in markdown)
-    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        throw new Error('Could not parse Gemini response as JSON');
+  const result = await model.generateContent([
+    prompt,
+    {
+      inlineData: {
+        mimeType: file.type,
+        data: base64
+      }
     }
+  ]);
 
-    const extractedData = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-    return extractedData;
+  const response = await result.response;
+  const text = response.text();
+
+  // Extract JSON from response (Gemini sometimes wraps it in markdown)
+  const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error('Could not parse Gemini response as JSON');
+  }
+
+  const extractedData = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+  return extractedData;
 }
 
 function mergeResults(results: any[]) {
-    if (results.length === 1) {
-        return results[0];
-    }
+  if (results.length === 1) {
+    return results[0];
+  }
 
-    // Merge strategy: Use first page for metadata, combine all pay events, use last page for totals
-    const merged = {
-        employeeInfo: results[0].employeeInfo,
-        period: results[0].period,
-        payEvents: results.flatMap((r: any) => r.payEvents),
-        calculations: results[results.length - 1].calculations,
-        confidence: results.reduce((sum: number, r: any) => sum + r.confidence, 0) / results.length
-    };
+  // Merge strategy: Use first page for metadata, combine all pay events, use last page for totals
+  const merged = {
+    employeeInfo: results[0].employeeInfo,
+    period: results[0].period,
+    payEvents: results.flatMap((r: any) => r.payEvents),
+    calculations: results[results.length - 1].calculations,
+    confidence: results.reduce((sum: number, r: any) => sum + r.confidence, 0) / results.length
+  };
 
-    // Remove duplicate pay events (same date)
-    const uniqueEvents = new Map();
-    merged.payEvents.forEach((event: any) => {
-        uniqueEvents.set(event.date, event);
-    });
-    merged.payEvents = Array.from(uniqueEvents.values());
+  // Remove duplicate pay events (same date)
+  const uniqueEvents = new Map();
+  merged.payEvents.forEach((event: any) => {
+    uniqueEvents.set(event.date, event);
+  });
+  merged.payEvents = Array.from(uniqueEvents.values());
 
-    return merged;
+  return merged;
 }

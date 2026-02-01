@@ -79,11 +79,16 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
           body: formData
         })
 
+        console.log('Gemini API response status:', response.status)
+
         if (!response.ok) {
-          throw new Error('Gemini API request failed')
+          const errorData = await response.json()
+          console.error('Gemini API error response:', errorData)
+          throw new Error(errorData.error || 'Gemini API request failed')
         }
 
         const geminiData = await response.json()
+        console.log('Gemini extraction successful! Confidence:', geminiData.confidence)
         
         // Convert Gemini format to internal format
         const structured = {
@@ -121,8 +126,10 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
         setCurrentStep('review')
         return
       } catch (geminiError) {
-        console.warn('Gemini extraction failed, falling back to Tesseract:', geminiError)
-        setError('Gemini API unavailable, using Tesseract (lower accuracy). Please add GEMINI_API_KEY to .env for better results.')
+        console.error('Gemini extraction failed:', geminiError)
+        const errorMessage = geminiError instanceof Error ? geminiError.message : 'Unknown error'
+        console.warn('Falling back to Tesseract. Gemini error:', errorMessage)
+        setError(`Gemini API error: ${errorMessage}. Using Tesseract fallback (lower accuracy).`)
       }
 
       // Fallback to Tesseract

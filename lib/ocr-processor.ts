@@ -53,7 +53,7 @@ export interface ExtractedData {
 export const processImage = async (imageFile: File, useGemini: boolean = true): Promise<OCRResult> => {
     try {
         // Try Gemini first if enabled and API key is available
-        if (useGemini && process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+        if (useGemini && process.env.GEMINI_API_KEY) {
             try {
                 console.log('Using Gemini Vision API for OCR...');
                 const geminiResult = await extractWithGemini(imageFile);
@@ -89,7 +89,7 @@ export const processImage = async (imageFile: File, useGemini: boolean = true): 
 
 export const processMultipleImages = async (imageFiles: File[], useGemini: boolean = true): Promise<OCRResult> => {
     // Try Gemini for multi-page processing if enabled
-    if (useGemini && process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+    if (useGemini && process.env.GEMINI_API_KEY) {
         try {
             console.log('Using Gemini Vision API for multi-page OCR...');
             const geminiResult = await extractMultipleWithGemini(imageFiles);
