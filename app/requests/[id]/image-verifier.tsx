@@ -89,13 +89,14 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
 
         const geminiData = await response.json()
         console.log('Gemini extraction successful! Confidence:', geminiData.confidence)
+        console.log('Extracted pay events:', geminiData.payEvents?.length || 0)
         
         // Validate Gemini response structure
         if (!geminiData.employeeInfo || !geminiData.period || !geminiData.payEvents) {
           throw new Error('Invalid Gemini response structure')
         }
         
-        // Convert Gemini format to internal format with null safety
+        // Convert new Gemini format (with 6th/7th CPC) to internal format
         const structured = {
           metadata: {
             employeeName: geminiData.employeeInfo.name || 'Unknown',
@@ -106,21 +107,47 @@ export default function ImageVerifier({ segments, totalArrear, daRates, requestI
               end: parseDate(geminiData.period.endDate)
             }
           },
-          payEvents: (geminiData.payEvents || []).map((event: any) => ({
-            date: parseDate(event.date),
-            basicPay: event.basicPay || 0,
-            gradePay: event.gradePay || null,
-            daPercent: event.daPercent || 0,
-            hra: event.hra || null,
-            totalPay: (event.basicPay || 0) + (event.gradePay || 0) + (event.hra || 0),
-            type: event.eventType || 'NORMAL',
-            confidence: geminiData.confidence || 0.5
-          })),
+          payEvents: (geminiData.payEvents || []).map((event: any) => {
+            // Handle new structure with sixthCPC and seventhCPC
+            const sixthCPC = event.sixthCPC || {}
+            const seventhCPC = event.seventhCPC || {}
+            
+            return {
+              date: parseDate(event.periodStart || event.date),
+              periodEnd: parseDate(event.periodEnd),
+              days: event.days || null,
+              // Use 7th CPC (new pay) as the primary basic pay
+              basicPay: seventhCPC.basicPay || event.basicPay || 0,
+              gradePay: sixthCPC.gradePay || event.gradePay || null,
+              daPercent: seventhCPC.daPercent || event.daPercent || 0,
+              hra: seventhCPC.hra || event.hra || null,
+              // Store both 6th and 7th CPC data for comparison
+              sixthCPC: {
+                basicPay: sixthCPC.basicPay || 0,
+                gradePay: sixthCPC.gradePay || null,
+                daPercent: sixthCPC.daPercent || 0,
+                daAmount: sixthCPC.daAmount || null,
+                hra: sixthCPC.hra || null,
+                total: sixthCPC.total || 0
+              },
+              seventhCPC: {
+                basicPay: seventhCPC.basicPay || 0,
+                daPercent: seventhCPC.daPercent || 0,
+                daAmount: seventhCPC.daAmount || null,
+                hra: seventhCPC.hra || null,
+                total: seventhCPC.total || 0
+              },
+              netArrear: event.netArrear || 0,
+              totalPay: seventhCPC.total || (seventhCPC.basicPay || 0) + (seventhCPC.daAmount || 0) + (seventhCPC.hra || 0),
+              type: event.eventType || 'NORMAL',
+              confidence: geminiData.confidence || 0.5
+            }
+          }),
           calculations: {
             totalDue: geminiData.calculations?.totalDue || 0,
             totalDrawn: geminiData.calculations?.totalDrawn || 0,
             netArrear: geminiData.calculations?.netArrear || 0,
-            breakdowns: geminiData.calculations?.periodBreakdowns || []
+            breakdowns: []
           },
           rawOCRText: JSON.stringify(geminiData, null, 2),
           confidence: geminiData.confidence || 0.5

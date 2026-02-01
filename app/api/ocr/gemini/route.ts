@@ -55,59 +55,61 @@ async function processImageWithGemini(file: File) {
   const arrayBuffer = await file.arrayBuffer();
   const base64 = Buffer.from(arrayBuffer).toString('base64');
 
-  const prompt = `You are analyzing a government arrear calculation sheet from BBMB (Bhakra Beas Management Board). This document contains detailed pay calculations for an employee.
+  const prompt = `You are analyzing a BBMB (Bhakra Beas Management Board) arrear calculation sheet. This is a COMPLEX TABULAR DOCUMENT that shows period-wise pay calculations comparing 6th CPC (old pay - what was drawn) vs 7th CPC (new pay - what is due).
 
-CRITICAL INSTRUCTIONS:
-1. This is a TABULAR document with rows and columns
-2. Extract ALL data from the table systematically - DO NOT skip any rows
-3. Pay special attention to dates, amounts, and percentages
-4. The table typically has these columns: Date, DA%, Basic Pay, Grade Pay, HRA, Total Due, Total Drawn, Arrear
+**CRITICAL: UNDERSTAND THE TABLE STRUCTURE**
 
-EXTRACT THE FOLLOWING DATA:
+The table has ROWS for different time periods and COLUMNS for different pay components. Each row represents a period (e.g., "01.01.2016 to 31.01.2016") and shows:
 
-**Employee Information:**
-- Employee Name (usually at top of document)
+**COLUMNS YOU WILL SEE:**
+1. Period/Date columns (From date, To date, or combined "From-To")
+2. Days in period
+3. 6th CPC (OLD PAY - DRAWN) columns:
+   - Basic Pay (6th CPC)
+   - Grade Pay
+   - DA % (old rate)
+   - DA Amount (old)
+   - HRA (old)
+   - **Total Drawn** (6th CPC total)
+4. 7th CPC (NEW PAY - DUE) columns:
+   - Basic Pay (7th CPC) - usually higher
+   - DA % (new rate)
+   - DA Amount (new)
+   - HRA (new)
+   - **Total Due** (7th CPC total)
+5. Net Arrear (Due - Drawn for that period)
+
+**YOUR TASK:**
+
+Extract EVERY ROW from the table. For each period/row, you must extract:
+- The period dates (from and to)
+- The 6th CPC Basic Pay (smaller amount, what was drawn)
+- The 7th CPC Basic Pay (larger amount, what is due)
+- Grade Pay (if present)
+- DA percentages (both old and new if different)
+- **Total Drawn** for that period
+- **Total Due** for that period
+- **Net Arrear** for that period
+
+**EMPLOYEE INFORMATION:**
+Extract from the top of the document:
+- Employee Name
 - Employee ID/Number
-- Designation/Post (if mentioned)
-
-**Period:**
-- Start Date (first date in calculation period)
-- End Date (last date in calculation period)
-
-**Pay Events Table:**
-For EACH ROW in the table, extract:
-- Date (format: DD.MM.YYYY or DD/MM/YYYY)
-- Basic Pay (7th CPC revised pay - usually larger amounts)
-- Grade Pay (6th CPC, if present - usually smaller amounts like 4200, 4600, 4800)
-- DA Percentage (Dearness Allowance % - like 119%, 125%, 131%)
-- HRA (House Rent Allowance, if present)
-- Event Type: Determine if this is:
-  * "PROMOTION" - if there's a large jump in basic pay (>5000)
-  * "INCREMENT" - if there's a small increase in basic pay (typically 3% annual increment)
-  * "REVISION" - if only DA% changes but basic pay stays same
-  * "NORMAL" - otherwise
-
-**Calculations:**
-- Total Due (sum of all "Due" amounts or "7th CPC" amounts or "Revised Pay" amounts)
-- Total Drawn (sum of all "Drawn" amounts or "6th CPC" amounts or "Old Pay" amounts)
-- Net Arrear (Total Due - Total Drawn, also called "Payable" or "Arrear Amount")
-- If there are period-wise breakdowns in the table, extract each period with its amounts
+- Designation/Post
 
 **IMPORTANT RULES:**
-- Extract EVERY single row from the table - if there are 20 rows, I need 20 pay events
-- If a cell is empty or unclear, use null
-- For dates, maintain DD.MM.YYYY format
-- For amounts, extract only numbers (remove ₹, commas, or any currency symbols)
-- Be precise with percentages - include the exact number
-- Look for both horizontal and vertical table layouts
-- Some sheets have multiple sections - extract all of them
+1. Extract EVERY SINGLE ROW - if there are 30 periods, extract all 30
+2. For each row, you MUST extract BOTH the "Drawn" (6th CPC) and "Due" (7th CPC) amounts
+3. The "Drawn" amount is usually in columns labeled "6th CPC", "Old Pay", or "Drawn"
+4. The "Due" amount is usually in columns labeled "7th CPC", "Revised Pay", or "Due"
+5. Remove all currency symbols (₹) and commas from numbers
+6. Dates should be in DD.MM.YYYY format
+7. If a cell is empty, use null
 
-**COMMON TABLE PATTERNS:**
-Pattern 1: Period | DA% | Basic | Grade Pay | DA Amount | Total Due | Total Drawn | Arrear
-Pattern 2: Date | Revised Pay | Old Pay | Difference
-Pattern 3: From-To | Days | Basic | DA% | Due | Drawn | Net
+**OUTPUT FORMAT:**
 
-Return the data in this EXACT JSON format (no markdown, just pure JSON):
+Return ONLY valid JSON (no markdown, no code blocks) in this EXACT structure:
+
 {
   "employeeInfo": {
     "name": "string",
@@ -120,29 +122,65 @@ Return the data in this EXACT JSON format (no markdown, just pure JSON):
   },
   "payEvents": [
     {
-      "date": "DD.MM.YYYY",
-      "basicPay": number,
-      "gradePay": number or null,
-      "daPercent": number,
-      "hra": number or null,
+      "periodStart": "DD.MM.YYYY",
+      "periodEnd": "DD.MM.YYYY",
+      "days": number or null,
+      "sixthCPC": {
+        "basicPay": number,
+        "gradePay": number or null,
+        "daPercent": number,
+        "daAmount": number or null,
+        "hra": number or null,
+        "total": number
+      },
+      "seventhCPC": {
+        "basicPay": number,
+        "daPercent": number,
+        "daAmount": number or null,
+        "hra": number or null,
+        "total": number
+      },
+      "netArrear": number,
       "eventType": "NORMAL|INCREMENT|PROMOTION|REVISION"
     }
   ],
   "calculations": {
     "totalDue": number,
     "totalDrawn": number,
-    "netArrear": number,
-    "periodBreakdowns": [
-      {
-        "period": "string",
-        "due": number,
-        "drawn": number,
-        "arrear": number
-      }
-    ] or null
+    "netArrear": number
   },
-  "confidence": number (0.0 to 1.0, your confidence in this extraction)
-}`;
+  "confidence": number (0.0 to 1.0)
+}
+
+**EXAMPLE:**
+If you see a row like:
+| 01.01.2016 | 31.01.2016 | 31 | 55500 | 4200 | 119% | 66045 | 8325 | 134070 | 60199 | 125% | 75249 | 9030 | 144478 | 10408 |
+
+You should extract:
+{
+  "periodStart": "01.01.2016",
+  "periodEnd": "31.01.2016",
+  "days": 31,
+  "sixthCPC": {
+    "basicPay": 55500,
+    "gradePay": 4200,
+    "daPercent": 119,
+    "daAmount": 66045,
+    "hra": 8325,
+    "total": 134070
+  },
+  "seventhCPC": {
+    "basicPay": 60199,
+    "daPercent": 125,
+    "daAmount": 75249,
+    "hra": 9030,
+    "total": 144478
+  },
+  "netArrear": 10408,
+  "eventType": "NORMAL"
+}
+
+**CRITICAL:** Extract ALL rows, not just a sample!`;
 
   const result = await model.generateContent([
     prompt,
