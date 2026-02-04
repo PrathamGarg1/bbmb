@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import Link from 'next/link'
-import { FileText, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react'
+import { FileText, CheckCircle, XCircle, Clock, Loader2, Book } from 'lucide-react'
 
 // Mock session hook (replace with real auth hook later)
 const useSession = () => {
@@ -24,16 +24,10 @@ export default function DashboardPage() {
 
     const fetchRequests = async () => {
         try {
-            // Need an API to fetch requests based on role
-            // const res = await fetch('/api/requests')
-            // const data = await res.json()
-            // setRequests(data)
-            
-            // Mock Data for UI Dev
-            setRequests([
-                { id: '1', employeeName: 'Brij Bhushan', status: 'PENDING_L1', totalArrear: 420425, createdAt: new Date() },
-                { id: '2', employeeName: 'Amit Sharma', status: 'DRAFT', totalArrear: 0, createdAt: new Date() },
-            ])
+            const res = await fetch('/api/requests')
+            if (!res.ok) throw new Error('Failed to fetch')
+            const data = await res.json()
+            setRequests(data)
         } catch (e) {
             console.error(e)
         } finally {
@@ -58,6 +52,9 @@ export default function DashboardPage() {
                     <p className="text-slate-500">Welcome, {user.name} ({user.role})</p>
                 </div>
                 <div>
+                    <Link href="/docs" className="text-slate-500 hover:text-slate-800 font-medium px-4 py-2 transition-colors flex items-center gap-2">
+                        <Book className="w-4 h-4" /> Docs
+                    </Link>
                     <Link href="/requests/new" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm flex items-center gap-2">
                         <FileText className="w-4 h-4" />
                         New Arrear Request

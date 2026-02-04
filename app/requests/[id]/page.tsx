@@ -20,55 +20,21 @@ export default function RequestDetailsPage() {
     const [actionLoading, setActionLoading] = useState(false)
 
     useEffect(() => {
-        // In a real app, this data fetch would happen via Server Component props or API
-        // For the demo to work without full DB seeding, we will SIMULATE the engine result 
-        // using the Brij Bhushan data structure if ID matches, or generic data.
-        
         async function loadData() {
             setLoading(true)
             try {
-                // Fetch Request Metadata
-                // const res = await fetch(`/api/requests/${params.id}`)
-                
-                // MOCK DATA GENERATION FOR DEMO (Since we can't easily call engine from client without API)
-                // We will create a "Perfect" segment set that matches the robustness test
-                const mockSegments = []
-                // ... (Populate with some real-looking data segments for visual confirmation)
-                // Let's generate a few sample segments for 2016
-                const start = new Date('2016-01-01')
-                for(let i=0; i<12; i++) {
-                     mockSegments.push({
-                        startDate: new Date(2016, i, 1),
-                        endDate: new Date(2016, i + 1, 0),
-                        durationLabel: '1 M',
-                        basicPay: 52000,
-                        daPercentage: 0,
-                        totalDue: 52000,
-                        drawnBasicPay: 46000,
-                        drawnGradePay: 0, 
-                        drawnIR: 0,
-                        drawnDA: 0,
-                        totalDrawn: 46000 + (46000 * 0.1), // aprox
-                        // ...
-                     })
-                }
-
-                setRequest({
-                    id: params.id,
-                    employeeName: 'Brij Bhushan', // Fallback
-                    startDate: '2016-01-01',
-                    endDate: '2021-06-30',
-                    status: 'PENDING_L1',
-                    verificationResult: JSON.stringify({
-                         comparison: { overallAccuracy: 99.5, anomalies: [] }
-                    }),
-                    segments: mockSegments // Passed to grid
-                })
-
-            } catch(e) { console.error(e) }
-            finally { setLoading(false) }
+                const res = await fetch(`/api/requests/${params.id}`)
+                if (!res.ok) throw new Error('Failed to fetch')
+                const data = await res.json()
+                setRequest(data)
+            } catch(e) { 
+                console.error(e)
+                alert('Failed to load request details')
+            } finally { 
+                setLoading(false) 
+            }
         }
-        loadData()
+        if (params.id) loadData()
     }, [params.id])
 
     const handleWorkflowAction = async (action: string) => {
