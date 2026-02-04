@@ -48,6 +48,8 @@ model ArrearRequest {
   auditLogs      AuditLog[]
   
   calculationResult String? // JSON string of the detailed calculation grid
+  verificationResult String? // JSON string of the OCR verification result (anomalies, certificate status)
+  uploadedImages    String[] // URLs/Paths to uploaded sheet images
   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -85,4 +87,15 @@ model AuditLog {
   performedBy   User          @relation(fields: [performedById], references: [id])
   
   createdAt   DateTime      @default(now())
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
 }

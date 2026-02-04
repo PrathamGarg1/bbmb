@@ -61,7 +61,10 @@ export function calculateArrears(req: CalculationRequest): Segment[] {
 
     // 1st of every month
     let iter = startOfMonth(startDate)
-    if (isBefore(iter, startDate)) iter = startOfMonth(addDays(iter, 35))
+    // Fix: Ensure we don't skip the first month if startDate is the 1st (ignoring time)
+    if (isBefore(iter, startDate) && !isSameDay(iter, startDate)) {
+        iter = startOfMonth(addDays(iter, 35))
+    }
     while (isBefore(iter, addDays(endDate, 1))) {
         boundaries.add(format(iter, 'yyyy-MM-dd'))
         iter = addDays(endOfMonth(iter), 1)
@@ -133,9 +136,10 @@ export function calculateArrears(req: CalculationRequest): Segment[] {
             segmentDrawn = monthlyTotalDrawn
             durationLabel = "1 M"
         } else {
-            // Use Actual Days in Month for denominator (matches Reference Sheet logic for May 2018)
-            segmentDue = Math.round(monthlyTotalDue * (daysInSeg / daysInMonth))
-            segmentDrawn = Math.round(monthlyTotalDrawn * (daysInSeg / daysInMonth))
+            // FIX: As per user request, removed proration factor to avoid "double proration"
+            // The inputs are assumed to be already prorated or the user desires the linear difference
+            segmentDue = monthlyTotalDue
+            segmentDrawn = monthlyTotalDrawn
             durationLabel = `${daysInSeg} D`
         }
 
@@ -180,6 +184,14 @@ export interface CalculationDiscrepancy {
     possibleReasons: string[]
 }
 
+export interface Anomaly {
+    type: 'CRITICAL' | 'WARNING'
+    field: string
+    message: string
+    period: string
+    value?: number
+}
+
 export interface CalculationComparison {
     systemResult: Segment[]
     sheetCalculations: {
@@ -188,6 +200,7 @@ export interface CalculationComparison {
         netArrear: number
     }
     discrepancies: CalculationDiscrepancy[]
+    anomalies: Anomaly[] // Added Anomaly Array
     overallAccuracy: number
     matchPercentage: number
 }
@@ -202,6 +215,40 @@ export function compareCalculations(
     }
 ): CalculationComparison {
     const discrepancies: CalculationDiscrepancy[] = []
+    const anomalies: Anomaly[] = []
+
+    // 0. Detect Anomalies in System Result
+    let previousBasicPay = 0
+    systemSegments.forEach((seg, idx) => {
+        // Check for Negative Net Arrear (Overpayment)
+        const net = seg.totalDue - seg.totalDrawn
+        if (net < -100) {
+            anomalies.push({
+                type: 'WARNING',
+                field: 'Net Arrear',
+                message: `Negative arrear detected (Overpayment) of ₹${Math.abs(Math.round(net))}. Verify drawn amounts.`,
+                period: format(seg.startDate, 'MMM yyyy'),
+                value: net
+            })
+        }
+
+        // Check for Basic Pay Drop
+        if (idx > 0 && seg.basicPay < previousBasicPay) {
+            // Ignore if it looks like a transition to a split/prorated amount (which might be lower absolute value)
+            // But valid full month drops are rare.
+            // If duration is full month and pay drops, it's weird.
+            if (seg.durationLabel.includes('1 M')) {
+                anomalies.push({
+                    type: 'CRITICAL',
+                    field: 'Basic Pay',
+                    message: `Basic Pay dropped from ₹${previousBasicPay} to ₹${seg.basicPay} without split month logic.`,
+                    period: format(seg.startDate, 'MMM yyyy'),
+                    value: seg.basicPay
+                })
+            }
+        }
+        previousBasicPay = seg.basicPay
+    })
 
     // Calculate system totals
     const systemTotalDue = systemSegments.reduce((sum, seg) => sum + seg.totalDue, 0)
@@ -299,5 +346,6 @@ export function compareCalculations(
         discrepancies,
         overallAccuracy,
         matchPercentage,
+        anomalies
     }
 }

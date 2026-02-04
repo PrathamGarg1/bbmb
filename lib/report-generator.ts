@@ -374,6 +374,97 @@ export const generateVerificationReport = async (data: VerificationReportData) =
         doc.setTextColor(0, 0, 0);
     }
 
+    // ===== ANOMALY REPORT =====
+    if (data.comparison.anomalies && data.comparison.anomalies.length > 0) {
+        doc.addPage();
+        yPos = 15;
+
+        doc.setTextColor(220, 38, 38); // Red
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('⚠ ANOMALY DETECTION REPORT', 105, yPos, { align: 'center' });
+        doc.setTextColor(0, 0, 0);
+
+        yPos += 15;
+
+        data.comparison.anomalies.forEach((anomaly, index) => {
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            const color = anomaly.type === 'CRITICAL' ? [220, 38, 38] : [234, 179, 8];
+            doc.setTextColor(color[0], color[1], color[2]);
+            doc.text(`[${anomaly.type}] ${anomaly.field} - ${anomaly.period}`, 14, yPos);
+
+            yPos += 5;
+            doc.setTextColor(0, 0, 0);
+            doc.setFont('helvetica', 'normal');
+            doc.text(anomaly.message, 14, yPos);
+
+            yPos += 10;
+        });
+    }
+
+    // ===== VERIFICATION CERTIFICATE =====
+    doc.addPage();
+
+    // Border
+    doc.setLineWidth(1);
+    doc.setDrawColor(59, 130, 246);
+    doc.rect(10, 10, 190, 277);
+
+    doc.setLineWidth(0.5);
+    doc.rect(12, 12, 186, 273);
+
+    yPos = 60;
+
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(59, 130, 246);
+    doc.text('VERIFICATION CERTIFICATE', 105, yPos, { align: 'center' });
+
+    yPos += 20;
+    doc.setFontSize(12);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+
+    const certAccuracy = data.comparison.overallAccuracy || 0;
+    const isVerified = certAccuracy >= 99;
+
+    const statusText = isVerified
+        ? 'This document certifies that the pay arrear calculations for the employee listed below have been verified against the 7th CPC guidelines and found to be ACCURATE.'
+        : 'This document indicates that the pay arrear calculations for the employee listed below have been processed, but discrepancies were found requiring manual review.';
+
+    const splitText = doc.splitTextToSize(statusText, 160);
+    doc.text(splitText, 105, yPos, { align: 'center' });
+
+    yPos += 40;
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Employee: ${data.extractedData.metadata.employeeName}`, 105, yPos, { align: 'center' });
+    yPos += 10;
+    doc.text(`Employee ID: ${data.extractedData.metadata.employeeId}`, 105, yPos, { align: 'center' });
+
+    yPos += 30;
+
+    doc.setFontSize(40);
+    if (isVerified) {
+        doc.setTextColor(34, 197, 94); // Green
+        doc.text('VERIFIED', 105, yPos, { align: 'center' });
+    } else {
+        doc.setTextColor(234, 179, 8); // Yellow
+        doc.text('REVIEW REQUIRED', 105, yPos, { align: 'center' });
+    }
+
+    yPos += 20;
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`System Confidence Score: ${certAccuracy.toFixed(2)}%`, 105, yPos, { align: 'center' });
+
+    yPos += 50;
+    doc.setDrawColor(0);
+    doc.line(60, yPos, 150, yPos);
+    doc.text('Authorized Signatory', 105, yPos + 5, { align: 'center' });
+
     // ===== FOOTER =====
     const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
