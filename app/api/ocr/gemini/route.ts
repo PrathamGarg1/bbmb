@@ -126,7 +126,7 @@ Return ONLY valid JSON (no markdown, no code blocks) in this EXACT structure:
       "periodEnd": "DD.MM.YYYY",
       "days": number or null,
       "sixthCPC": {
-        "basicPay": number,
+        "basicPay": number, // IMPORTANT: Must be MAXIMUM MONTHLY RATE, not pro-rated
         "gradePay": number or null,
         "daPercent": number,
         "daAmount": number or null,
@@ -134,7 +134,7 @@ Return ONLY valid JSON (no markdown, no code blocks) in this EXACT structure:
         "total": number
       },
       "seventhCPC": {
-        "basicPay": number,
+        "basicPay": number, // IMPORTANT: Must be MAXIMUM MONTHLY RATE, not pro-rated
         "daPercent": number,
         "daAmount": number or null,
         "hra": number or null,
@@ -151,6 +151,23 @@ Return ONLY valid JSON (no markdown, no code blocks) in this EXACT structure:
   },
   "confidence": number (0.0 to 1.0)
 }
+
+**CRITICAL EXAMPLES FOR PARTIAL MONTHS:**
+
+Example 1 (Full Month):
+Row: | 01.01.2016 - 31.01.2016 | 31 Days | BP: 50000 | ...
+Output Basic Pay: 50000
+
+Example 2 (Partial Month - e.g. 2 Days):
+Row warning: | 01.12.2020 - 02.12.2020 | 2 Days | BP: 3226 | ...
+
+**DO NOT OUTPUT 3226 as Basic Pay!** 
+If the period is only 2 days, the amount shown (3226) is the pro-rated amount.
+You MUST output the full MONTHLY RATE. 
+Logic: (3226 / 2) * 30 = ~48390. Or look at the previous/next rows to find the standard monthly pay (e.g. 50000).
+**Result: "basicPay": 50000** (The full monthly rate)
+
+**RULE: The "basicPay" in JSON must ALWAYS be the full monthly salary rate used for calculation, NEVER the pro-rated amount for a few days.**
 
 **EXAMPLE:**
 If you see a row like:
