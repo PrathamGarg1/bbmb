@@ -1,132 +1,67 @@
+
 'use client'
 
-import { calculateArrears } from '@/lib/calculation-engine'
 import { format } from 'date-fns'
-import { cn } from '@/lib/utils'
 
 interface CalculationGridProps {
-  request: any
-  payEvents: any[]
-  daRates: any[]
+    segments: any[] // In real app, enforce Segment[] type
 }
 
-export default function CalculationGrid({ request, payEvents, daRates }: CalculationGridProps) {
-  const safeEvents = payEvents.map(p => ({
-    ...p,
-    date: new Date(p.date)
-  }))
-  
-  const safeDARates = daRates.map(d => ({
-    ...d,
-    effectiveDate: new Date(d.effectiveDate)
-  }))
+export default function CalculationGrid({ segments }: CalculationGridProps) {
+    if (!segments || segments.length === 0) {
+        return <div className="p-8 text-center text-slate-400">No calculation data available.</div>
+    }
 
-  const segments = calculateArrears({
-    startDate: new Date(request.startDate),
-    endDate: new Date(request.endDate),
-    payEvents: safeEvents,
-    daRates: safeDARates
-  })
+    const totalDue = segments.reduce((sum, s) => sum + s.totalDue, 0)
+    const totalDrawn = segments.reduce((sum, s) => sum + s.totalDrawn, 0)
+    const totalArrear = totalDue - totalDrawn
 
-  // Calculate Aggregates
-  const totalArrear = segments.reduce((sum, seg) => sum + (seg.totalDue - seg.totalDrawn), 0)
-
-  return (
-    <div>
-      <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-white">
-      <div className="overflow-x-auto max-h-[600px] relative">
-        <table className="min-w-full divide-y divide-slate-200 text-xs text-center border-collapse">
-          <thead className="bg-slate-50 sticky top-0 z-10 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            {/* Header Row 1: Groupings */}
-            <tr>
-              <th className="border-b border-r border-slate-200 px-3 py-2 sticky left-0 z-20 bg-slate-50 text-left text-slate-500 font-semibold w-[160px]">Period</th>
-              <th className="border-b border-slate-200 px-2 py-1 font-semibold text-slate-500 bg-slate-50 sticky left-[160px] z-20 w-[100px]">Duration</th>
-              <th colSpan={5} className="border-b border-r border-slate-200 px-2 py-2 font-bold text-slate-700 bg-slate-50/50">DUE (Revised)</th>
-              <th colSpan={6} className="border-b border-r border-slate-200 px-2 py-2 font-bold text-slate-700 bg-slate-50/50">DRAWN (Old)</th>
-              <th colSpan={3} className="border-b border-slate-200 px-2 py-2 font-bold text-slate-900 bg-slate-100">NET ARREAR</th>
-            </tr>
-            {/* Header Row 2: Columns */}
-            <tr>
-              <th className="border-b border-r border-slate-200 px-3 py-2 text-left bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 font-medium sticky left-0 z-20 top-[33px]">Dates</th>
-              <th className="border-b border-slate-200 px-2 py-2 text-center bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 font-medium sticky left-[160px] z-20 top-[33px]">Months/Days</th>
-              
-              {/* DUE Columns */}
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">DA%</th>
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">Basic</th>
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">DA Amt</th>
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">HRA</th>
-              <th className="border-b border-r border-slate-200 px-2 py-2 text-right text-[10px] text-slate-600 font-bold bg-slate-50/30">Total Due</th>
-
-              {/* DRAWN Columns */}
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">DA%</th>
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">Basic</th>
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">G.Pay</th>
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">IR</th>
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">DA Amt</th>
-              <th className="border-b border-r border-slate-200 px-2 py-2 text-right text-[10px] text-slate-600 font-bold bg-slate-50/30">Total Drawn</th>
-              
-              {/* DIFF Columns */}
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">Monthly Diff</th>
-              <th className="border-b border-r border-slate-200 px-2 py-2 text-right text-[10px] text-slate-400 font-medium">Factor</th>
-              <th className="border-b border-slate-200 px-2 py-2 text-right text-[10px] text-slate-800 font-bold bg-slate-100">Net Payable</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-slate-100">
-            {segments.map((seg, idx) => (
-              <tr key={idx} className="hover:bg-slate-50 transition-colors group">
-                <td className="border-r border-slate-100 px-3 py-2 whitespace-nowrap font-medium text-slate-700 text-[11px] sticky left-0 bg-white group-hover:bg-slate-50 z-10 text-left">
-                  {format(seg.startDate, 'dd.MM.yy')} - {format(seg.endDate, 'dd.MM.yy')}
-                </td>
-                <td className="border-r border-slate-100 px-2 py-2 whitespace-nowrap text-slate-500 text-[10px] sticky left-[160px] bg-white group-hover:bg-slate-50 z-10">
-                   {seg.durationLabel}
-                </td>
-                
-                {/* DUE */}
-                <td className="px-2 py-2 text-right text-slate-500 font-mono">{seg.daPercentage}%</td>
-                <td className="px-2 py-2 text-right text-slate-900 font-medium font-mono">{seg.basicPay}</td>
-                <td className="px-2 py-2 text-right text-slate-500 font-mono">{seg.daRate}</td>
-                <td className="px-2 py-2 text-right text-slate-300 font-mono">-</td>
-                <td className="border-r border-slate-100 px-2 py-2 text-right font-medium text-slate-700 bg-slate-50/30 font-mono">
-                  {seg.monthlyDueTotal}
-                </td>
-
-                {/* DRAWN */}
-                <td className="px-2 py-2 text-right text-slate-500 font-mono">{seg.drawnDAPercentage}%</td>
-                <td className="px-2 py-2 text-right text-slate-500 font-mono">{seg.drawnBasicPay}</td>
-                <td className="px-2 py-2 text-right text-slate-500 font-mono">{seg.drawnGradePay}</td>
-                <td className="px-2 py-2 text-right text-slate-500 font-mono">{seg.drawnIR}</td>
-                <td className="px-2 py-2 text-right text-slate-500 font-mono">{seg.drawnDA}</td>
-                <td className="border-r border-slate-100 px-2 py-2 text-right font-medium text-slate-700 bg-slate-50/30 font-mono">
-                  {seg.drawnTotal}
-                </td>
-
-                {/* DIFF & TOTAL */}
-                <td className="px-2 py-2 text-right text-slate-400 font-mono">
-                   {seg.monthlyDueTotal - seg.drawnTotal}
-                </td>
-                <td className="border-r border-slate-100 px-2 py-2 text-right text-slate-400 text-[10px] font-mono">
-                   {/* Factor */}
-                </td>
-                <td className={cn(
-                  "px-2 py-2 text-right font-bold font-mono bg-slate-50",
-                  Math.round(seg.totalDue - seg.totalDrawn) >= 0 ? "text-emerald-600" : "text-red-500"
-                )}>
-                    {Math.round(seg.totalDue - seg.totalDrawn)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-sm sticky bottom-0 z-10 shadow-[0_-1px_2px_rgba(0,0,0,0.05)]">
-            <tr>
-              <td colSpan={13} className="px-4 py-3 text-right uppercase text-xs text-slate-500 font-bold tracking-wider">Net Arrear Payable:</td>
-              <td className="px-4 py-3 text-right text-slate-900 border-l border-slate-200 bg-emerald-50/50">
-                ₹ {totalArrear.toLocaleString()}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      </div>
-    </div>
-  )
+    return (
+        <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left border-collapse">
+                <thead className="text-[10px] text-slate-500 uppercase bg-slate-50 border-b">
+                     <tr>
+                        <th className="px-3 py-2 border-r bg-slate-100">Period</th>
+                        <th className="px-3 py-2 border-r bg-slate-100">Dur</th>
+                        <th className="px-3 py-2 text-right border-r bg-blue-50/50">Basic</th>
+                        <th className="px-3 py-2 text-right border-r bg-blue-50/50">DA%</th>
+                        <th className="px-3 py-2 text-right border-r font-bold bg-blue-50 text-blue-800">Due Total</th>
+                        <th className="px-3 py-2 text-right border-r bg-amber-50/50">Drawn Basic</th>
+                        <th className="px-3 py-2 text-right border-r bg-amber-50/50">Drawn DA</th>
+                        <th className="px-3 py-2 text-right border-r font-bold bg-amber-50 text-amber-800">Drawn Total</th>
+                        <th className="px-3 py-2 text-right font-black bg-slate-100">Net Arrear</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {segments.map((seg, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-3 py-2 font-mono whitespace-nowrap border-r text-slate-600">
+                                {format(new Date(seg.startDate), 'dd-MMM-yy')} <span className="text-slate-300">to</span> {format(new Date(seg.endDate), 'dd-MMM-yy')}
+                            </td>
+                            <td className="px-3 py-2 border-r text-center text-slate-500 text-[10px]">{seg.durationLabel}</td>
+                            
+                            <td className="px-3 py-2 text-right border-r font-mono">{Math.round(seg.basicPay)}</td>
+                            <td className="px-3 py-2 text-right border-r text-slate-500">{seg.daPercentage}%</td>
+                            <td className="px-3 py-2 text-right border-r font-mono font-bold text-blue-700 bg-blue-50/30">{Math.round(seg.totalDue)}</td>
+                            
+                            <td className="px-3 py-2 text-right border-r font-mono text-slate-600">{Math.round(seg.drawnBasicPay + (seg.drawnGradePay||0) + (seg.drawnIR||0))}</td>
+                            <td className="px-3 py-2 text-right border-r font-mono text-slate-600">{Math.round(seg.drawnDA)}</td>
+                            <td className="px-3 py-2 text-right border-r font-mono font-bold text-amber-700 bg-amber-50/30">{Math.round(seg.totalDrawn)}</td>
+                            
+                            <td className={`px-3 py-2 text-right font-mono font-black ${seg.totalDue - seg.totalDrawn < 0 ? 'text-red-600' : 'text-slate-900'}`}>
+                                {Math.round(seg.totalDue - seg.totalDrawn)}
+                            </td>
+                        </tr>
+                    ))}
+                    <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
+                        <td colSpan={4} className="px-3 py-3 text-right uppercase text-xs text-slate-500">Totals</td>
+                        <td className="px-3 py-3 text-right text-blue-700">{Math.round(totalDue)}</td>
+                        <td colSpan={2}></td>
+                        <td className="px-3 py-3 text-right text-amber-700">{Math.round(totalDrawn)}</td>
+                        <td className="px-3 py-3 text-right text-lg text-slate-900">{Math.round(totalArrear)}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    )
 }
